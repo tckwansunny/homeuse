@@ -1,0 +1,1292 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>兆康站即時時間表</title>
+  <style>
+    /* 設定根字體大小變數 */
+    :root {
+      font-size: 16px;
+      --bg-color: #e5e7eb;
+      --container-bg: transparent;
+      --text-color: #1f2937;
+      --header-border: #d1d5db;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --dest-color: #111827;
+      --dest-prefix-color: #4b5563;
+      --car-length-color: #6b7280;
+      --next-time-color: #4b5563;
+      --next-num-color: #1f2937;
+      --plat-bg: #f3f4f6;
+      --plat-color: #374151;
+      --plat-border: #e5e7eb;
+      --btn-bg: #ffffff;
+      --btn-color: #374151;
+      --btn-border: #cbd5e1;
+      --debug-bg: #1e293b;
+      --debug-header-text: #f8fafc;
+      --debug-text: #cbd5e1;
+      --divider-color: #94a3b8; /* 加深分界線顏色 */
+    }
+
+    /* 深色模式變數 */
+    [data-theme="dark"] {
+      --bg-color: #0f172a;
+      --text-color: #f8fafc;
+      --header-border: #334155;
+      --card-bg: #1e293b;
+      --card-border: #334155;
+      --dest-color: #f8fafc;
+      --dest-prefix-color: #94a3b8;
+      --car-length-color: #94a3b8;
+      --next-time-color: #94a3b8;
+      --next-num-color: #f8fafc;
+      --plat-bg: #334155;
+      --plat-color: #e2e8f0;
+      --plat-border: #475569;
+      --btn-bg: #1e293b;
+      --btn-color: #f8fafc;
+      --btn-border: #475569;
+      --debug-bg: #090d16;
+      --debug-header-text: #f8fafc;
+      --debug-text: #94a3b8;
+      --divider-color: #475569; /* 加深深色模式分界線顏色 */
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background-color: var(--bg-color);
+      color: var(--text-color);
+      padding: 6px;
+      display: flex;
+      justify-content: center;
+      transition: background-color 0.2s, color 0.2s;
+    }
+    .container { width: 100%; max-width: 650px; }
+    
+    /* 標頭 */
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding-bottom: 6px;
+      margin-bottom: 4px;
+      border-bottom: 1px solid var(--header-border);
+    }
+    .title-group {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      flex-wrap: wrap;
+    }
+    .title-group h1 { font-size: 1rem; color: #d97706; display: inline-block; }
+
+    /* 時間模式控制橫列 */
+    .time-mode-bar {
+      display: flex;
+      justify-content: flex-end;
+      margin-bottom: 6px;
+    }
+
+    /* 天氣警告外層容器 */
+    .weather-container {
+      display: none;
+      flex-direction: column;
+      gap: 4px;
+      margin-bottom: 8px;
+    }
+    
+    .weather-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .weather-banner {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      background-color: #fee2e2;
+      border: 1px solid #ef4444;
+      color: #991b1b;
+      padding: 3px 8px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      min-width: 0;
+    }
+    [data-theme="dark"] .weather-banner {
+      background-color: #7f1d1d;
+      border-color: #b91c1c;
+      color: #f87171;
+    }
+    .weather-item {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+    }
+    .weather-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-weight: bold;
+    }
+    .weather-time {
+      font-size: 0.75rem;
+      opacity: 0.85;
+      white-space: nowrap;
+    }
+
+    /* 按鈕群組通用樣式 */
+    .font-controls, .theme-control, .time-control {
+      display: flex;
+      gap: 2px;
+      background: var(--bg-color);
+      padding: 2px;
+      border-radius: 4px;
+      border: 1px solid var(--header-border);
+    }
+    .btn-font, .btn-theme, .btn-time-mode {
+      background-color: var(--btn-bg);
+      color: var(--btn-color);
+      border: 1px solid var(--btn-border);
+      padding: 1px 6px;
+      border-radius: 6px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      cursor: pointer;
+      line-height: 1.2;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .btn-time-mode {
+      padding: 2px 10px;
+      white-space: nowrap;
+    }
+    .btn-font:active, .btn-theme:active, .btn-time-mode:active { background-color: rgba(0,0,0,0.1); }
+
+    .controls { text-align: right; display: flex; align-items: center; gap: 5px; }
+
+    .btn-toggle-all {
+      background-color: var(--btn-bg);
+      color: var(--btn-color);
+      border: 1px solid var(--btn-border);
+      padding: 3px 6px;
+      border-radius: 4px;
+      font-size: 0.75rem;
+      font-weight: bold;
+      cursor: pointer;
+      line-height: 1.2;
+    }
+    .btn-toggle-all:active { opacity: 0.7; }
+
+    .status { font-size: 0.75rem; color: var(--car-length-color); display: flex; align-items: center; gap: 5px; margin-left: 2px; }
+    
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      background-color: #9ca3af;
+      border-radius: 50%;
+      display: inline-block;
+      flex-shrink: 0;
+    }
+    .status-dot.active { background-color: #16a34a; box-shadow: 0 0 4px #16a34a; }
+    .status-dot.error { background-color: #dc2626; box-shadow: 0 0 4px #dc2626; }
+
+    header .status-dot {
+      width: 12px !important;
+      height: 12px !important;
+      min-width: 12px !important;
+      min-height: 12px !important;
+    }
+
+    .btn-refresh {
+      background-color: #d97706; color: #ffffff; border: none;
+      padding: 4px 8px; border-radius: 4px; font-weight: bold;
+      font-size: 0.8rem; cursor: pointer; flex-shrink: 0;
+    }
+    .btn-refresh:active { opacity: 0.7; }
+    
+    /* 類別分界線樣式：改為 2px 實線，保留原邊距不拉長頁面 */
+    .section-divider {
+      border: 0;
+      border-top: 2px solid var(--divider-color);
+      margin: 4px 0;
+      opacity: 0.85;
+    }
+
+    /* 可收合的類別標題列 */
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin: 4px 0 4px 0;
+      cursor: pointer;
+      user-select: none;
+    }
+    .section-header-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .section-title {
+      font-size: 0.85rem;
+      font-weight: bold;
+      padding-left: 6px;
+      border-left: 3px solid;
+      line-height: 1;
+      margin: 0;
+    }
+    .collapse-btn {
+      background: none;
+      border: none;
+      font-size: 0.75rem;
+      cursor: pointer;
+      padding: 2px 4px;
+      border-radius: 3px;
+      font-weight: bold;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      color: inherit;
+    }
+    .collapse-btn:hover {
+      background-color: rgba(128, 128, 128, 0.15);
+    }
+
+    /* Dummy Mode 右側提醒按鈕 */
+    .dummy-indicator-btn {
+      display: none;
+      background-color: #fef3c7;
+      color: #b45309;
+      border: 1px solid #f59e0b;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.7rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .dummy-indicator-btn:hover {
+      background-color: #fde68a;
+    }
+    [data-theme="dark"] .dummy-indicator-btn {
+      background-color: #78350f;
+      color: #fef3c7;
+      border-color: #d97706;
+    }
+
+    /* 列表區域與收合控制 */
+    .card-list {
+      display: flex;
+      flex-direction: column;
+      padding-left: 4px;
+      margin-bottom: 4px;
+      transition: all 0.2s ease;
+    }
+    .card-list.collapsed {
+      display: none !important;
+    }
+
+    /* 卡片通用樣式 */
+    .card {
+      background-color: var(--card-bg);
+      border-radius: 6px;
+      padding: 4px 8px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      border-left: 4px solid;
+      box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08);
+      gap: 8px;
+      margin-bottom: 4px;
+      transition: background-color 0.2s;
+    }
+    .card:last-child { margin-bottom: 0; }
+    
+    .route-badge {
+      font-size: 1.15rem;
+      font-weight: 800;
+      padding: 1px 5px;
+      border-radius: 4px;
+      min-width: 58px;
+      text-align: center;
+      flex-shrink: 0;
+      line-height: 1.1;
+    }
+
+    .info {
+      flex: 1;
+      display: flex;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 6px;
+      min-width: 0;
+    }
+    
+    .dest-row {
+      display: flex;
+      align-items: baseline;
+      gap: 4px;
+      white-space: nowrap;
+    }
+
+    .dest-prefix { font-size: 0.75rem; color: var(--dest-prefix-color); font-weight: bold; }
+    .dest { font-size: 1.05rem; font-weight: bold; color: var(--dest-color); white-space: nowrap; }
+
+    .plat-badge {
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 0px 3px;
+      border-radius: 3px;
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      white-space: nowrap;
+      background-color: var(--plat-bg);
+      color: var(--plat-color);
+      border: 1px solid var(--plat-border);
+    }
+
+    .car-length { font-size: 0.85rem; color: var(--car-length-color); font-weight: normal; margin-left: 2px; white-space: nowrap; }
+
+    /* 各類別主題色彩 */
+    .sec-school .section-title { color: #0284c7; border-left-color: #0284c7; }
+    .sec-school .card { border-left-color: #0284c7; }
+    .sec-school .route-badge { background-color: #0284c7; color: #ffffff; }
+
+    .sec-bunny .section-title { color: #dc2626; border-left-color: #dc2626; }
+    .sec-bunny .card { border-left-color: #b91c1c; }
+    .sec-bunny .route-badge { background-color: #b91c1c; color: #ffffff; }
+
+    .sec-city .section-title { color: #16a34a; border-left-color: #16a34a; }
+    .sec-city .card { border-left-color: #16a34a; }
+    .sec-city .route-badge { background-color: #16a34a; color: #ffffff; }
+
+    .sec-other .section-title { color: #9333ea; border-left-color: #9333ea; }
+    .sec-other .card { border-left-color: #9333ea; }
+    .sec-other .route-badge { background-color: #9333ea; color: #ffffff; }
+
+    .sec-work { margin-top: 4px; margin-bottom: 4px; }
+    .sec-work-row { display: flex; flex-direction: column; gap: 4px; }
+    .sec-work .section-header { margin: 0; }
+    .sec-work .section-title { color: #dc2626; border-left-color: #dc2626; }
+    .sec-work .card { margin-bottom: 0; flex: 1; border-left-color: #b91c1c; }
+    .sec-work .route-badge { background-color: #b91c1c; color: #ffffff; }
+
+    /* 時間區欄位 */
+    .time-box { text-align: right; flex-shrink: 0; min-width: 90px; }
+    .time { font-size: 1.25rem; font-weight: bold; color: #16a34a; line-height: 1.1; }
+    
+    .next-time { 
+      font-size: 0.75rem; 
+      color: var(--next-time-color);
+      margin-top: 1px; 
+      white-space: nowrap;
+    }
+    
+    .next-time .time-num {
+      font-size: 0.95rem;
+      font-weight: 700;
+      color: var(--next-num-color);
+    }
+    
+    .arriving { color: #dc2626; animation: pulse 1.2s infinite; font-size: 1.1rem; }
+    @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+    
+    .empty-msg { text-align: center; padding: 4px 0; color: var(--car-length-color); font-size: 0.8rem; }
+
+    /* Debug 偵錯面板樣式 */
+    .debug-panel {
+      margin-top: 12px;
+      background: var(--debug-bg);
+      color: #38bdf8;
+      padding: 8px 10px;
+      border-radius: 6px;
+      font-family: monospace;
+      font-size: 0.75rem;
+    }
+    .debug-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      cursor: pointer;
+      font-weight: bold;
+      color: var(--debug-header-text);
+    }
+    .debug-title-left {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .debug-content {
+      margin-top: 8px;
+      max-height: 150px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      color: var(--debug-text);
+      display: none;
+    }
+
+    /* 底部 Dummy Mode 切換按鈕 */
+    .mode-toggle-bar {
+      margin-top: 12px;
+      text-align: center;
+    }
+    .btn-toggle-mode {
+      background-color: var(--btn-bg);
+      color: var(--text-color);
+      border: 1px solid var(--btn-border);
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      cursor: pointer;
+      transition: background-color 0.2s;
+    }
+    .btn-toggle-mode:hover { opacity: 0.8; }
+  </style>
+</head>
+<body>
+
+<div class="container">
+  <header>
+    <div class="title-group">
+      <h1>兆康站即時時間表</h1>
+      <div class="font-controls">
+        <button class="btn-font" onclick="changeFontSize(-1)" title="縮小字體">A-</button>
+        <button class="btn-font" onclick="changeFontSize(1)" title="放大字體">A+</button>
+      </div>
+      <div class="theme-control">
+        <button class="btn-theme" onclick="toggleTheme()" id="theme-btn" title="切換深色/淺色模式">🌙</button>
+      </div>
+    </div>
+    <div class="controls">
+      <button class="btn-toggle-all" onclick="expandAll()">打開全部</button>
+      <button class="btn-toggle-all" onclick="collapseAll()">收起全部</button>
+      <div class="status">
+        <span id="status-dot" class="status-dot"></span>
+        <span id="update-time">載入中...</span>
+      </div>
+      <button class="btn-refresh" onclick="fetchAllSchedules()">更新</button>
+    </div>
+  </header>
+
+  <!-- 時間切換按鈕專用列 -->
+  <div class="time-mode-bar">
+    <div class="time-control">
+      <button id="time-mode-btn" class="btn-time-mode" onclick="toggleTimeMode()">剩餘時間</button>
+    </div>
+  </div>
+
+  <!-- 天文台天氣警告容器 -->
+  <div id="weather-container" class="weather-container">
+    <div class="weather-row">
+      <div id="weather-banner" class="weather-banner">
+        <!-- 動態渲染多個警告項目 -->
+      </div>
+    </div>
+  </div>
+
+  <!-- 第 1 部分：方小輕鐵 (藍色) -->
+  <div class="sec-school">
+    <div class="section-header" onclick="toggleSection('school')">
+      <div class="section-header-left">
+        <button class="collapse-btn" id="btn-collapse-school">▼</button>
+        <div class="section-title">方小輕鐵</div>
+      </div>
+      <button class="dummy-indicator-btn" onclick="event.stopPropagation(); toggleDummyMode();">⚠️ Dummy Mode (按此轉回真實)</button>
+    </div>
+    <div id="school-lrt-list" class="card-list"><div class="empty-msg">正在獲取資料...</div></div>
+  </div>
+
+  <!-- 分界線 1 -->
+  <hr class="section-divider">
+
+  <!-- 第 2 部分：Bunny Bee (紅色) -->
+  <div class="sec-bunny">
+    <div class="section-header" onclick="toggleSection('bunny')">
+      <div class="section-header-left">
+        <button class="collapse-btn" id="btn-collapse-bunny">▼</button>
+        <div class="section-title">Bunny Bee</div>
+      </div>
+      <button class="dummy-indicator-btn" onclick="event.stopPropagation(); toggleDummyMode();">⚠️ Dummy Mode (按此轉回真實)</button>
+    </div>
+    <div id="bunny-bee-list" class="card-list"><div class="empty-msg">正在獲取資料...</div></div>
+  </div>
+
+  <!-- 分界線 2 -->
+  <hr class="section-divider">
+
+  <!-- 第 3 部分：市中心 (綠色) -->
+  <div class="sec-city">
+    <div class="section-header" onclick="toggleSection('city')">
+      <div class="section-header-left">
+        <button class="collapse-btn" id="btn-collapse-city">▼</button>
+        <div class="section-title">市中心</div>
+      </div>
+      <button class="dummy-indicator-btn" onclick="event.stopPropagation(); toggleDummyMode();">⚠️ Dummy Mode (按此轉回真實)</button>
+    </div>
+    <div id="city-center-list" class="card-list"><div class="empty-msg">正在獲取資料...</div></div>
+  </div>
+
+  <!-- 分界線 3 -->
+  <hr class="section-divider">
+
+  <!-- 第 4 部分：其他 (紫色) -->
+  <div class="sec-other">
+    <div class="section-header" onclick="toggleSection('other')">
+      <div class="section-header-left">
+        <button class="collapse-btn" id="btn-collapse-other">▼</button>
+        <div class="section-title">其他</div>
+      </div>
+      <button class="dummy-indicator-btn" onclick="event.stopPropagation(); toggleDummyMode();">⚠️ Dummy Mode (按此轉回真實)</button>
+    </div>
+    <div id="other-lrt-list" class="card-list"><div class="empty-msg">正在獲取資料...</div></div>
+  </div>
+
+  <!-- 分界線 4 -->
+  <hr class="section-divider">
+
+  <!-- 第 5 部分：返工 (紅色系) -->
+  <div class="sec-work">
+    <div class="sec-work-row">
+      <div class="section-header" onclick="toggleSection('work')">
+        <div class="section-header-left">
+          <button class="collapse-btn" id="btn-collapse-work">▼</button>
+          <div class="section-title">返工 💀</div>
+        </div>
+        <button class="dummy-indicator-btn" onclick="event.stopPropagation(); toggleDummyMode();">⚠️ Dummy Mode (按此轉回真實)</button>
+      </div>
+      <div id="work-tml-container" style="flex: 1; min-width: 0;">
+        <div id="work-tml-list" class="card-list" style="margin-bottom: 0;"><div class="empty-msg" style="text-align: left;">正在獲取資料...</div></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Panel 1: 輕鐵 API 檢查器 -->
+  <div class="debug-panel">
+    <div class="debug-header" onclick="toggleDebug('lrt-debug-content')">
+      <div class="debug-title-left">
+        <span id="lrt-status-dot" class="status-dot"></span>
+        <span>🛠️ 輕鐵 (LRT) 數據狀態檢查器</span>
+      </div>
+      <span id="lrt-debug-status-text">載入中...</span>
+    </div>
+    <div id="lrt-debug-content" class="debug-content">等待載入輕鐵數據...</div>
+  </div>
+
+  <!-- Panel 2: 屯馬線 API 檢查器 -->
+  <div class="debug-panel">
+    <div class="debug-header" onclick="toggleDebug('tml-debug-content')">
+      <div class="debug-title-left">
+        <span id="tml-status-dot" class="status-dot"></span>
+        <span>🛠️ 屯馬線 (TML) 數據狀態檢查器</span>
+      </div>
+      <span id="tml-debug-status-text">載入中...</span>
+    </div>
+    <div id="tml-debug-content" class="debug-content">等待載入屯馬線數據...</div>
+  </div>
+
+  <!-- Panel 3: 天文台 API 檢查器 -->
+  <div class="debug-panel">
+    <div class="debug-header" onclick="toggleDebug('hko-debug-content')">
+      <div class="debug-title-left">
+        <span id="hko-status-dot" class="status-dot"></span>
+        <span>🛠️ 天文台 (HKO) 數據狀態檢查器</span>
+      </div>
+      <div style="display: flex; align-items: center; gap: 8px;" onclick="event.stopPropagation()">
+        <span id="hko-debug-status-text">載入中...</span>
+      </div>
+    </div>
+    <div id="hko-debug-content" class="debug-content">等待載入天文台數據...</div>
+  </div>
+
+  <!-- 底部 Dummy Mode 切換按鈕 -->
+  <div class="mode-toggle-bar">
+    <button id="btn-mode-toggle" class="btn-toggle-mode" onclick="toggleDummyMode()">切換模式中...</button>
+  </div>
+</div>
+
+<script>
+  // ------------------ 設定區 ------------------
+  let ENABLE_DUMMY_MODE = false; 
+  const REFRESH_INTERVAL = 10000;  
+  let timeDisplayMode = localStorage.getItem('preferred_time_mode') || 'remaining';
+  let cachedLrtData = null;
+  let cachedTmlData = null;
+  let lastFetchTime = null;
+  // --------------------------------------------
+
+  const LRT_API = 'https://rt.data.gov.hk/v1/transport/mtr/lrt/getSchedule?station_id=100';
+  const MTR_API = 'https://rt.data.gov.hk/v1/transport/mtr/getSchedule.php?line=TML&sta=SIH&lang=CH';
+  const HKO_WARN_API = 'https://data.weather.gov.hk/weatherAPI/opendata/weather.php?dataType=warnsum&lang=tc';
+
+  const PLATFORM_EMOJIS = { '1': '🔴', '2': '🔵', '3': '🟢', '4': '🟡', '5': '🟣', '6': '🟠' };
+
+  // 時間模式按鈕初始化
+  function initTimeModeButton() {
+    const btn = document.getElementById('time-mode-btn');
+    if (btn) {
+      btn.innerText = timeDisplayMode === 'remaining' ? '剩餘時間' : '實際時間';
+    }
+  }
+
+  function toggleTimeMode() {
+    timeDisplayMode = timeDisplayMode === 'remaining' ? 'actual' : 'remaining';
+    localStorage.setItem('preferred_time_mode', timeDisplayMode);
+    initTimeModeButton();
+
+    if (cachedLrtData) processLrtData(cachedLrtData);
+    if (cachedTmlData) processTmlData(cachedTmlData);
+  }
+  initTimeModeButton();
+
+  // Theme 切換邏輯
+  function initTheme() {
+    const savedTheme = localStorage.getItem('preferred_theme') || 'light';
+    document.documentElement.setAttribute('data-theme', savedTheme);
+    updateThemeButton(savedTheme);
+  }
+  function toggleTheme() {
+    const currentTheme = document.documentElement.getAttribute('data-theme');
+    const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+    document.documentElement.setAttribute('data-theme', newTheme);
+    localStorage.setItem('preferred_theme', newTheme);
+    updateThemeButton(newTheme);
+  }
+  function updateThemeButton(theme) {
+    const btn = document.getElementById('theme-btn');
+    btn.innerText = theme === 'dark' ? '☀️' : '🌙';
+  }
+  initTheme();
+
+  // 字體大小控制邏輯
+  let currentFontSize = parseFloat(localStorage.getItem('preferred_font_size')) || 16;
+  function applyFontSize() {
+    document.documentElement.style.fontSize = currentFontSize + 'px';
+    localStorage.setItem('preferred_font_size', currentFontSize);
+  }
+  function changeFontSize(direction) {
+    currentFontSize = Math.min(Math.max(currentFontSize + direction * 1.5, 12), 24);
+    applyFontSize();
+  }
+  applyFontSize();
+
+  // 類別收合狀態控制邏輯
+  const sectionKeys = ['school', 'bunny', 'city', 'other', 'work'];
+  const sectionStates = {};
+
+  function initSectionStates() {
+    sectionKeys.forEach(key => {
+      const saved = localStorage.getItem(`collapse_${key}`);
+      sectionStates[key] = saved === 'true';
+      applySectionState(key);
+    });
+  }
+
+  function toggleSection(key) {
+    sectionStates[key] = !sectionStates[key];
+    localStorage.setItem(`collapse_${key}`, sectionStates[key]);
+    applySectionState(key);
+  }
+
+  function applySectionState(key) {
+    let listEl;
+    if (key === 'school') listEl = document.getElementById('school-lrt-list');
+    else if (key === 'bunny') listEl = document.getElementById('bunny-bee-list');
+    else if (key === 'city') listEl = document.getElementById('city-center-list');
+    else if (key === 'other') listEl = document.getElementById('other-lrt-list');
+    else if (key === 'work') listEl = document.getElementById('work-tml-list');
+
+    const btnEl = document.getElementById(`btn-collapse-${key}`);
+
+    if (listEl && btnEl) {
+      if (sectionStates[key]) {
+        listEl.classList.add('collapsed');
+        btnEl.innerText = '▶';
+      } else {
+        listEl.classList.remove('collapsed');
+        btnEl.innerText = '▼';
+      }
+    }
+  }
+
+  function expandAll() {
+    sectionKeys.forEach(key => {
+      sectionStates[key] = false;
+      localStorage.setItem(`collapse_${key}`, 'false');
+      applySectionState(key);
+    });
+  }
+
+  function collapseAll() {
+    sectionKeys.forEach(key => {
+      sectionStates[key] = true;
+      localStorage.setItem(`collapse_${key}`, 'true');
+      applySectionState(key);
+    });
+  }
+
+  const DUMMY_LRT_DATA = {
+    platform_list: [
+      {
+        platform_id: "2",
+        route_list: [
+          { route_no: "505", dest_ch: "三聖", time_ch: "2 分鐘", train_length: 2 },
+          { route_no: "505", dest_ch: "三聖", time_ch: "8 分鐘", train_length: 1 },
+          { route_no: "505", dest_ch: "三聖", time_ch: "15 分鐘", train_length: 2 },
+          { route_no: "615P", dest_ch: "屯門碼頭", time_ch: "5 分鐘", train_length: 1 },
+          { route_no: "615P", dest_ch: "屯門碼頭", time_ch: "12 分鐘", train_length: 1 },
+          { route_no: "615P", dest_ch: "屯門碼頭", time_ch: "19 分鐘", train_length: 2 },
+          { route_no: "615", dest_ch: "屯門碼頭", time_ch: "4 分鐘", train_length: 2 },
+          { route_no: "615", dest_ch: "屯門碼頭", time_ch: "11 分鐘", train_length: 1 },
+          { route_no: "615", dest_ch: "屯門碼頭", time_ch: "18 分鐘", train_length: 2 }
+        ]
+      },
+      {
+        platform_id: "6",
+        route_list: [
+          { route_no: "614P", dest_ch: "屯門碼頭", time_ch: "即將抵達", train_length: 1 },
+          { route_no: "614P", dest_ch: "屯門碼頭", time_ch: "7 分鐘", train_length: 1 },
+          { route_no: "614P", dest_ch: "屯門碼頭", time_ch: "14 分鐘", train_length: 2 },
+          { route_no: "614", dest_ch: "屯門碼頭", time_ch: "3 分鐘", train_length: 1 },
+          { route_no: "614", dest_ch: "屯門碼頭", time_ch: "10 分鐘", train_length: 2 },
+          { route_no: "614", dest_ch: "屯門碼頭", time_ch: "17 分鐘", train_length: 1 },
+          { route_no: "751", dest_ch: "友愛", time_ch: "6 分鐘", train_length: 2 },
+          { route_no: "751", dest_ch: "友愛", time_ch: "13 分鐘", train_length: 2 },
+          { route_no: "751", dest_ch: "友愛", time_ch: "20 分鐘", train_length: 1 }
+        ]
+      },
+      {
+        platform_id: "5",
+        route_list: [
+          { route_no: "610", dest_ch: "屯門碼頭", time_ch: "1 分鐘", train_length: 1 },
+          { route_no: "610", dest_ch: "屯門碼頭", time_ch: "9 分鐘", train_length: 2 },
+          { route_no: "610", dest_ch: "屯門碼頭", time_ch: "16 分鐘", train_length: 1 }
+        ]
+      }
+    ]
+  };
+
+  const DUMMY_TML_DATA = {
+    data: {
+      'TML-SIH': {
+        sys_time: '2026/09/13 12:00:00',
+        UP: [
+          { dest: 'TUM', plat: '1', ttnt: '2', time: '2026-09-13 12:02:00' },
+          { dest: 'TUM', plat: '1', ttnt: '7', time: '2026-09-13 12:07:00' },
+          { dest: 'TUM', plat: '1', ttnt: '14', time: '2026-09-13 12:14:00' }
+        ],
+        DOWN: [
+          { dest: 'WKS', plat: '2', ttnt: '3', time: '2026-09-13 12:03:00' },
+          { dest: 'WKS', plat: '2', ttnt: '8', time: '2026-09-13 12:08:00' },
+          { dest: 'WKS', plat: '2', ttnt: '15', time: '2026-09-13 12:15:00' }
+        ]
+      }
+    }
+  };
+
+  const DUMMY_HKO_WARN_DATA = {
+    "TC8NW": {
+      "name": "八號西北烈風或暴風信號",
+      "code": "TC8NW",
+      "actionCode": "ISSUE",
+      "issueTime": "2026-09-13 06:20:00",
+      "urgent": true
+    },
+    "WRAIN": {
+      "name": "黑色暴雨警告信號",
+      "code": "WRAIN",
+      "actionCode": "ISSUE",
+      "issueTime": "2026-09-13 07:45:00",
+      "urgent": true
+    },
+    "WMSL": {
+      "name": "山泥傾瀉警告",
+      "code": "WMSL",
+      "actionCode": "ISSUE",
+      "issueTime": "2026-09-13 08:10:00",
+      "urgent": false
+    }
+  };
+
+  function updateModeButtonUI() {
+    const btn = document.getElementById('btn-mode-toggle');
+    const dummyIndicatorBtns = document.querySelectorAll('.dummy-indicator-btn');
+
+    if (ENABLE_DUMMY_MODE) {
+      btn.innerText = "🧪 目前模式：Dummy 測試資料 (點擊切換為真實 API)";
+      dummyIndicatorBtns.forEach(b => b.style.display = 'inline-block');
+    } else {
+      btn.innerText = "🟢 目前模式：真實 API 數據 (點擊切換為 Dummy 測試)";
+      dummyIndicatorBtns.forEach(b => b.style.display = 'none');
+    }
+  }
+
+  function toggleDummyMode() {
+    ENABLE_DUMMY_MODE = !ENABLE_DUMMY_MODE;
+    updateModeButtonUI();
+    fetchAllSchedules();
+    fetchWeatherWarnings();
+  }
+
+  function toggleDebug(contentId) {
+    const content = document.getElementById(contentId);
+    content.style.display = content.style.display === 'block' ? 'none' : 'block';
+  }
+
+  function setSystemStatus(status, text) {
+    const dot = document.getElementById('status-dot');
+    const timeEl = document.getElementById('update-time');
+    dot.className = 'status-dot ' + status;
+    timeEl.innerText = text;
+  }
+
+  function setPanelStatus(prefix, status, statusText) {
+    const dot = document.getElementById(`${prefix}-status-dot`);
+    const textEl = document.getElementById(`${prefix}-debug-status-text`);
+    dot.className = 'status-dot ' + status;
+    textEl.innerText = statusText;
+  }
+
+  function parseMinutes(timeStr) {
+    if (!timeStr) return 999;
+    if (timeStr.includes('即將') || timeStr.includes('Arriving') || timeStr.includes('正在')) return 0;
+    const match = timeStr.match(/(\d+)/);
+    return match ? parseInt(match[1], 10) : 998;
+  }
+
+  function formatSubTimeWithBigNumber(timeStr, lengthText = '') {
+    if (!timeStr) return '';
+    
+    // 涵蓋「即將」、「Arriving」、「離開」、「Departing」等動態狀態
+    if (/即將|Arriving|離開|Departing|正在/.test(timeStr)) {
+      return lengthText ? `${timeStr} (${lengthText})` : timeStr;
+    }
+    
+    let replaced = timeStr;
+    if (/\d{2}:\d{2}/.test(timeStr)) {
+      replaced = timeStr.replace(/(\d{2}:\d{2})/, '<span class="time-num">$1</span>');
+    } else {
+      replaced = timeStr.replace(/(\d+\s*分鐘|\d+)/, '<span class="time-num">$1</span>');
+    }
+    return lengthText ? `${replaced} (${lengthText})` : `${replaced}`;
+  }
+
+  function getPlatformFlagHtml(platformId) {
+    const platStr = String(platformId).trim();
+    const emoji = PLATFORM_EMOJIS[platStr] || '📍';
+    return `<span class="plat-badge"><span>${emoji}</span>${platStr}號月台</span>`;
+  }
+
+  function getWeatherIcon(warningName) {
+    if (warningName.includes('八號') || warningName.includes('九號') || warningName.includes('十號') || warningName.includes('烈風')) return '🌀';
+    if (warningName.includes('黑雨') || warningName.includes('紅色暴雨') || warningName.includes('暴雨')) return '🌧️';
+    if (warningName.includes('山泥傾瀉')) return '⛰️';
+    if (warningName.includes('雷暴')) return '⚡';
+    if (warningName.includes('寒冷')) return '❄️';
+    if (warningName.includes('酷熱')) return '🔥';
+    if (warningName.includes('火災')) return '🔥';
+    return '⚠️';
+  }
+
+  async function fetchWeatherWarnings() {
+    const container = document.getElementById('weather-container');
+    const banner = document.getElementById('weather-banner');
+    const hkoContent = document.getElementById('hko-debug-content');
+
+    if (ENABLE_DUMMY_MODE) {
+      setPanelStatus('hko', 'active', '測試模式');
+      renderWeatherBanner(DUMMY_HKO_WARN_DATA);
+      hkoContent.innerText = "--- 天文台 Dummy 數據 ---\n" + JSON.stringify(DUMMY_HKO_WARN_DATA, null, 2);
+      return;
+    }
+
+    try {
+      const res = await fetch(HKO_WARN_API);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setPanelStatus('hko', 'active', '連線正常');
+      renderWeatherBanner(data);
+      hkoContent.innerText = `最後更新: ${new Date().toLocaleString()}\n\n` + JSON.stringify(data, null, 2);
+    } catch (err) {
+      console.error('獲取天氣警告失敗:', err);
+      setPanelStatus('hko', 'error', '連線失敗');
+      container.style.display = 'none';
+      hkoContent.innerText = `[天文台 API 錯誤]: ${err.message}`;
+    }
+  }
+
+  function renderWeatherBanner(data) {
+    const container = document.getElementById('weather-container');
+    const banner = document.getElementById('weather-banner');
+    let itemsHtml = [];
+
+    for (const key in data) {
+      if (data.hasOwnProperty(key)) {
+        const item = data[key];
+        if (item && item.name) {
+          const icon = getWeatherIcon(item.name);
+          let timeStr = '';
+          
+          if (item.issueTime) {
+            const d = new Date(item.issueTime);
+            if (!isNaN(d.getTime())) {
+              const month = String(d.getMonth() + 1).padStart(2, '0');
+              const day = String(d.getDate()).padStart(2, '0');
+              const hours = String(d.getHours()).padStart(2, '0');
+              const minutes = String(d.getMinutes()).padStart(2, '0');
+              timeStr = `(${month}月${day}日 ${hours}:${minutes}生效)`;
+            } else {
+              timeStr = `(${item.issueTime}生效)`;
+            }
+          }
+
+          itemsHtml.push(`
+            <div class="weather-item">
+              <div class="weather-left">
+                <span>${icon}</span>
+                <span>${item.name}</span>
+              </div>
+              ${timeStr ? `<div class="weather-time">${timeStr}</div>` : ''}
+            </div>
+          `);
+        }
+      }
+    }
+
+    if (itemsHtml.length > 0) {
+      container.style.display = 'flex';
+      banner.innerHTML = itemsHtml.join('');
+    } else {
+      container.style.display = 'none';
+      banner.innerHTML = '';
+    }
+  }
+
+  async function fetchAllSchedules() {
+    const lrtContent = document.getElementById('lrt-debug-content');
+    const tmlContent = document.getElementById('tml-debug-content');
+
+    const now = new Date();
+    lastFetchTime = now;
+    const timeString = now.toLocaleTimeString('zh-HK', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+    fetchWeatherWarnings();
+
+    if (ENABLE_DUMMY_MODE) {
+      setSystemStatus('active', '測試模式');
+      setPanelStatus('lrt', 'active', '測試模式');
+      setPanelStatus('tml', 'active', '測試模式');
+
+      cachedLrtData = DUMMY_LRT_DATA;
+      cachedTmlData = DUMMY_TML_DATA;
+
+      processLrtData(cachedLrtData);
+      processTmlData(cachedTmlData);
+
+      lrtContent.innerText = "--- 輕鐵 Dummy 數據 ---\n" + JSON.stringify(DUMMY_LRT_DATA, null, 2);
+      tmlContent.innerText = "--- 屯馬線 Dummy 數據 ---\n" + JSON.stringify(DUMMY_TML_DATA, null, 2);
+      return;
+    }
+
+    try {
+      const [lrtRes, tmlRes] = await Promise.all([
+        fetch(LRT_API).then(async r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); }),
+        fetch(MTR_API).then(async r => { if (!r.ok) throw new Error(`HTTP ${r.status}`); return r.json(); })
+      ]);
+
+      setSystemStatus('active', timeString);
+
+      cachedLrtData = lrtRes;
+      cachedTmlData = tmlRes;
+
+      setPanelStatus('lrt', 'active', '連線正常');
+      processLrtData(cachedLrtData);
+      lrtContent.innerText = `最後更新: ${now.toLocaleString()}\n\n` + JSON.stringify(lrtRes, null, 2);
+
+      setPanelStatus('tml', 'active', '連線正常');
+      processTmlData(cachedTmlData);
+      tmlContent.innerText = `最後更新: ${now.toLocaleString()}\n\n` + JSON.stringify(tmlRes, null, 2);
+
+    } catch (err) {
+      setSystemStatus('error', '部分異常');
+
+      try {
+        const lrtRes = await fetch(LRT_API).then(r => r.json());
+        cachedLrtData = lrtRes;
+        setPanelStatus('lrt', 'active', '連線正常');
+        processLrtData(cachedLrtData);
+        lrtContent.innerText = JSON.stringify(lrtRes, null, 2);
+      } catch (e) {
+        setPanelStatus('lrt', 'error', '連線失敗');
+        document.getElementById('school-lrt-list').innerHTML = `<div class="empty-msg">輕鐵資料載入失敗</div>`;
+        lrtContent.innerText = `[輕鐵 API 錯誤]: ${e.message}`;
+      }
+
+      try {
+        const tmlRes = await fetch(MTR_API).then(r => r.json());
+        cachedTmlData = tmlRes;
+        setPanelStatus('tml', 'active', '連線正常');
+        processTmlData(cachedTmlData);
+        tmlContent.innerText = JSON.stringify(tmlRes, null, 2);
+      } catch (e) {
+        setPanelStatus('tml', 'error', '連線失敗');
+        document.getElementById('bunny-bee-list').innerHTML = `<div class="empty-msg">屯馬線資料載入失敗</div>`;
+        document.getElementById('work-tml-list').innerHTML = `<div class="empty-msg" style="text-align: left;">屯馬線資料載入失敗</div>`;
+        tmlContent.innerText = `[屯馬線 API 錯誤]: ${e.message}`;
+      }
+    }
+  }
+
+  function processLrtData(data) {
+    const schoolMap = new Map();
+    const cityCenterMap = new Map();
+    const otherMap = new Map();
+
+    if (data && data.platform_list) {
+      data.platform_list.forEach(platform => {
+        const platformId = String(platform.platform_id).trim();
+        if (platform.route_list) {
+          platform.route_list.forEach(route => {
+            const routeNo = String(route.route_no).trim();
+            const destCh = (route.dest_ch || '').trim();
+
+            const isSchoolRoute = ((routeNo === '505' || routeNo === '615P') && destCh !== '兆康') ||
+                                  (routeNo === '615' && destCh.includes('屯門碼頭'));
+
+            const isCityCenterRoute = (routeNo === '614P' && destCh !== '兆康') ||
+                                      (routeNo === '614' && destCh.includes('屯門碼頭')) ||
+                                      (routeNo === '751' && destCh.includes('友愛'));
+
+            const isOtherRoute = (routeNo === '610' && destCh.includes('屯門碼頭'));
+
+            if (isSchoolRoute || isCityCenterRoute || isOtherRoute) {
+              const key = `${routeNo}_${destCh}`;
+              let targetMap = otherMap;
+              if (isSchoolRoute) targetMap = schoolMap;
+              else if (isCityCenterRoute) targetMap = cityCenterMap;
+
+              if (!targetMap.has(key)) {
+                targetMap.set(key, { routeNo: routeNo, dest: destCh, platform: platformId, schedules: [] });
+              }
+
+              targetMap.get(key).schedules.push({
+                timeCh: route.time_ch,
+                trainLength: route.train_length,
+                sortMinutes: parseMinutes(route.time_ch)
+              });
+            }
+          });
+        }
+      });
+    }
+
+    renderLrtSection('school-lrt-list', schoolMap);
+    renderLrtSection('city-center-list', cityCenterMap);
+    renderLrtSection('other-lrt-list', otherMap);
+  }
+
+  function processTmlData(data) {
+    const bunnyContainer = document.getElementById('bunny-bee-list');
+    const workContainer = document.getElementById('work-tml-list');
+    const fetchTime = lastFetchTime || new Date();
+    
+    let tumTrains = []; 
+    let wksTrains = []; 
+
+    if (data && data.data && data.data['TML-SIH']) {
+      const sihData = data.data['TML-SIH'];
+      const sysTimeStr = sihData.sys_time || sihData.curr_time;
+      const sysTime = sysTimeStr ? new Date(sysTimeStr.replace(/-/g, '/')) : fetchTime;
+
+      const allTrains = [...(sihData.UP || []), ...(sihData.DOWN || [])];
+
+      allTrains.forEach(train => {
+        let minutes = 999;
+        if (train.ttnt !== undefined && train.ttnt !== '' && !isNaN(parseInt(train.ttnt, 10))) {
+          minutes = parseInt(train.ttnt, 10);
+        } else if (train.time) {
+          const trainTime = new Date(train.time.replace(/-/g, '/'));
+          minutes = Math.max(0, Math.round((trainTime - sysTime) / 60000));
+        }
+
+        let displayTime = '';
+        if (timeDisplayMode === 'actual') {
+          if (train.time) {
+            const timeParts = train.time.split(' ')[1];
+            if (timeParts) displayTime = timeParts.substring(0, 5);
+          }
+          if (!displayTime) {
+            const targetDate = new Date(fetchTime.getTime() + minutes * 60000);
+            displayTime = targetDate.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
+          }
+        } else {
+          displayTime = minutes <= 1 ? '即將抵達' : `${minutes} 分鐘`;
+        }
+
+        const trainObj = { platform: train.plat || '1', timeCh: displayTime, sortMinutes: minutes, dest: train.dest };
+
+        if (train.dest === 'TUM' || train.dest === 'Tuen Mun' || (train.plat === '1' && train.dest !== 'WKS')) {
+          tumTrains.push(trainObj);
+        } else if (train.dest === 'WKS' || train.dest === 'Wu Kai Sha' || ['2','3','4'].includes(String(train.plat))) {
+          wksTrains.push(trainObj);
+        }
+      });
+    }
+
+    if (tumTrains.length === 0) {
+      bunnyContainer.innerHTML = `<div class="empty-msg">暫無屯馬線（往屯門）車次資料</div>`;
+    } else {
+      tumTrains.sort((a, b) => a.sortMinutes - b.sortMinutes);
+      const first = tumTrains[0], second = tumTrains[1], third = tumTrains[2];
+      const timeClass = (timeDisplayMode === 'remaining' && first.sortMinutes <= 1) ? 'time arriving' : 'time';
+      
+      let nextTimeHtml = '';
+      if (second && third) {
+        nextTimeHtml = `<div class="next-time">下班: ${formatSubTimeWithBigNumber(second.timeCh)} · 第3班: ${formatSubTimeWithBigNumber(third.timeCh)}</div>`;
+      } else if (second) {
+        nextTimeHtml = `<div class="next-time">下班: ${formatSubTimeWithBigNumber(second.timeCh)}</div>`;
+      }
+
+      bunnyContainer.innerHTML = `
+        <div class="card tml-card">
+          <div class="route-badge">屯馬線</div>
+          <div class="info">
+            <div class="dest-row"><span class="dest-prefix">往</span><span class="dest">屯門</span></div>
+            ${getPlatformFlagHtml(first.platform)}
+          </div>
+          <div class="time-box">
+            <div class="${timeClass}">${first.timeCh} <span class="car-length">(8卡)</span></div>
+            ${nextTimeHtml}
+          </div>
+        </div>
+      `;
+    }
+
+    if (wksTrains.length === 0) {
+      workContainer.innerHTML = `<div class="empty-msg" style="text-align: left;">暫無車次資料</div>`;
+    } else {
+      wksTrains.sort((a, b) => a.sortMinutes - b.sortMinutes);
+      const firstWks = wksTrains[0], secondWks = wksTrains[1], thirdWks = wksTrains[2];
+      const timeClassWks = (timeDisplayMode === 'remaining' && firstWks.sortMinutes <= 1) ? 'time arriving' : 'time';
+
+      let nextTimeWksHtml = '';
+      if (secondWks && thirdWks) {
+        nextTimeWksHtml = `<div class="next-time">下班: ${formatSubTimeWithBigNumber(secondWks.timeCh)} · 第3班: ${formatSubTimeWithBigNumber(thirdWks.timeCh)}</div>`;
+      } else if (secondWks) {
+        nextTimeWksHtml = `<div class="next-time">下班: ${formatSubTimeWithBigNumber(secondWks.timeCh)}</div>`;
+      }
+
+      workContainer.innerHTML = `
+        <div class="card tml-card">
+          <div class="route-badge">屯馬線</div>
+          <div class="info">
+            <div class="dest-row"><span class="dest-prefix">往</span><span class="dest">烏溪沙</span></div>
+            ${getPlatformFlagHtml(firstWks.platform)}
+          </div>
+          <div class="time-box">
+            <div class="${timeClassWks}">${firstWks.timeCh} <span class="car-length">(8卡)</span></div>
+            ${nextTimeWksHtml}
+          </div>
+        </div>
+      `;
+    }
+  }
+
+  function renderLrtSection(elementId, groupMap) {
+    const listEl = document.getElementById(elementId);
+    const fetchTime = lastFetchTime || new Date();
+    const groups = Array.from(groupMap.values()).map(g => {
+      g.schedules.sort((a, b) => a.sortMinutes - b.sortMinutes);
+      return g;
+    });
+    groups.sort((a, b) => a.schedules[0].sortMinutes - b.schedules[0].sortMinutes);
+
+    if (groups.length === 0) {
+      listEl.innerHTML = `<div class="empty-msg">暫無符合條件的車次資料</div>`;
+      return;
+    }
+
+    listEl.innerHTML = groups.map(group => {
+      const first = group.schedules[0];
+      const second = group.schedules[1];
+      const third = group.schedules[2];
+
+      const firstLengthText = (first && first.trainLength === 2) ? '2卡' : '1卡';
+
+      // 1. 首班車時間處理
+      let firstTimeStr = first.timeCh || '';
+      const isDynamicState = /即將|Arriving|離開|Departing|正在/.test(firstTimeStr);
+      
+      if (timeDisplayMode === 'actual' && !isDynamicState) {
+        const targetDate = new Date(fetchTime.getTime() + first.sortMinutes * 60000);
+        firstTimeStr = targetDate.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
+      }
+
+      const isArriving = timeDisplayMode === 'remaining' && (first.sortMinutes <= 1 || isDynamicState);
+      const timeClass = isArriving ? 'time arriving' : 'time';
+      
+      const formattedFirst = formatSubTimeWithBigNumber(firstTimeStr, '');
+
+      // 2. 下班車 (第 2、3 班) 時間處理
+      let nextTimeHtml = '';
+
+      if (second && second.timeCh) {
+        let secTimeStr = second.timeCh;
+        const isSecDynamic = /即將|Arriving|離開|Departing|正在/.test(secTimeStr);
+        if (timeDisplayMode === 'actual' && !isSecDynamic) {
+          const targetDateSec = new Date(fetchTime.getTime() + second.sortMinutes * 60000);
+          secTimeStr = targetDateSec.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
+        }
+        const secLengthText = second.trainLength === 2 ? '2卡' : '1卡';
+        const secStr = formatSubTimeWithBigNumber(secTimeStr, secLengthText);
+
+        if (third && third.timeCh) {
+          let thiTimeStr = third.timeCh;
+          const isThiDynamic = /即將|Arriving|離開|Departing|正在/.test(thiTimeStr);
+          if (timeDisplayMode === 'actual' && !isThiDynamic) {
+            const targetDateThi = new Date(fetchTime.getTime() + third.sortMinutes * 60000);
+            thiTimeStr = targetDateThi.toLocaleTimeString('zh-HK', { hour: '2-digit', minute: '2-digit', hour12: false });
+          }
+          const thiLengthText = third.trainLength === 2 ? '2卡' : '1卡';
+          const thiStr = formatSubTimeWithBigNumber(thiTimeStr, thiLengthText);
+          
+          nextTimeHtml = `<div class="next-time">下班: ${secStr} · 第3班: ${thiStr}</div>`;
+        } else {
+          nextTimeHtml = `<div class="next-time">下班: ${secStr}</div>`;
+        }
+      }
+
+      return `
+        <div class="card">
+          <div class="route-badge">${group.routeNo}</div>
+          <div class="info">
+            <div class="dest-row"><span class="dest-prefix">往</span><span class="dest">${group.dest}</span></div>
+            ${getPlatformFlagHtml(group.platform)}
+          </div>
+          <div class="time-box">
+            <div class="${timeClass}">${formattedFirst} <span class="car-length">(${firstLengthText})</span></div>
+            ${nextTimeHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+  initSectionStates();
+  updateModeButtonUI();
+  fetchAllSchedules();
+  
+  setInterval(fetchAllSchedules, REFRESH_INTERVAL);
+  setInterval(fetchWeatherWarnings, 60000);
+</script>
+
+</body>
+</html>
